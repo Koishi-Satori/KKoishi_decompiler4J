@@ -30,29 +30,39 @@ object Utils {
     fun getLocale(): Locale {
         var o = jsonMaps["property"]
         if (o == null) {
-            jsonParser = JsonParser(Path.of("./data/property").readText())
+            jsonParser = JsonParser(Path.of("./data/property.json").readText())
             jsonParser!!.parse()
             o = MappedJsonObject.cast(jsonParser!!.result(), HashMap::class.java)
         }
         jsonMaps["property"] = o!!
-        return o["current_locale"] as Locale
+        return Locale(o["current_locale"] as String)
     }
 
     @JvmStatic
+    private val classAccessFlags: Array<Pair<Int, String>> = arrayOf(
+        ClassReader.ACC_MODULE to "module",
+        ClassReader.ACC_ENUM to "enum ",
+        ClassReader.ACC_ANNOTATION to "@interface ",
+        ClassReader.ACC_SYNTHETIC to "",
+        ClassReader.ACC_ABSTRACT to "abstract ",
+        ClassReader.ACC_INTERFACE to "interface ",
+        ClassReader.ACC_SUPER to "",
+        ClassReader.ACC_FINAL to "final ",
+        ClassReader.ACC_PUBLIC to "public "
+    )
+
+    @JvmStatic
     fun parseClassAccessFlags(accessFlags: Int): String {
-        var af = accessFlags
-        val sb = StringBuilder()
-        if (af > ClassReader.ACC_MODULE) {
-            af -= ClassReader.ACC_MODULE
-            sb.append("Module_Info")
-        }
-        if (af > ClassReader.ACC_ENUM) {
-
-        }
-        TODO()
+        var cpy = accessFlags
+        val buf = StringBuilder()
+        classAccessFlags.forEach { with(it) {
+            if (cpy >= first) {
+                cpy -= first
+                buf.append(second)
+            }
+        } }
+        return buf.toString()
     }
-
-
 }
 
 object Options {
@@ -122,6 +132,12 @@ object Options {
             override fun process(task: DecompileTask, opt: String, arg: String?) {
                 verbose = true
             }
+        },
+        object : Option(false, "-instruction", "-inst", "-i") {
+            override fun process(task: DecompileTask, opt: String, arg: String?) {
+                instructions = true
+            }
+
         })
 
     @JvmStatic
@@ -144,6 +160,9 @@ object Options {
 
     @JvmStatic
     var verbose = false
+
+    @JvmStatic
+    var instructions = false
 }
 
 class ResourceException : Exception {
@@ -295,19 +314,19 @@ class DecompileTask @JvmOverloads constructor(val locale: Locale = Utils.getLoca
         map[Messages::class] = this
     }
 
-    override fun getMessage(key: String, vararg args: Any?): String = getMessage(locale, key, args)
+    override fun getMessage(key: String, vararg args: Any?): String = getMessage(locale, key, *args)
 
     override fun getMessage(locale: Locale, key: String, vararg args: Any?): String {
         var bundle = bundles[locale]
         if (bundle == null) {
             try {
-                bundle = ResourceBundle.getBundle("top.kkoishi.decomp.resources.kecomplie", locale)
+                bundle = ResourceBundle.getBundle("kecompile", locale)
             } catch (e: Exception) {
                 throw ResourceException(e)
             }
             bundles[locale] = bundle
         }
-        return MessageFormat.format(bundle!!.getString(key), args)
+        return MessageFormat.format(bundle!!.getString(key), *args)
     }
 
     fun run(args: Array<String>): Int {
@@ -326,10 +345,10 @@ class DecompileTask @JvmOverloads constructor(val locale: Locale = Utils.getLoca
             re.printStackTrace(System.err)
             return EXIT_SYSTEM_ERR
         } catch (oe: IndexOutOfBoundsException) {
-            oe.fillInStackTrace()
+            oe.printStackTrace(System.err)
             return EXIT_SYSTEM_ERR
         } catch (e: Exception) {
-            e.fillInStackTrace()
+            e.printStackTrace(System.err)
             return EXIT_ERROR
         }
         return EXIT_OK
@@ -381,5 +400,5 @@ class DecompileTask @JvmOverloads constructor(val locale: Locale = Utils.getLoca
 
     fun reportError(errKey: String, vararg args: String) = System.err.println(getMessage(errKey, *args))
 
-    fun report(msg: String) = System.err.println(msg.replace("\n", Utils.nl, false).replace("\t", "    ", false))
+    fun report(msg: String) = System.out.println(msg.replace("\n", Utils.nl, false).replace("\t", "    ", false))
 }

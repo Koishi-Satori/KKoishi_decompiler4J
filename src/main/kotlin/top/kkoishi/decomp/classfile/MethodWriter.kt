@@ -8,11 +8,13 @@ import top.kkoishi.decomp.Context
 import top.kkoishi.decomp.DecompileTask
 import top.kkoishi.decomp.Options
 
+@Suppress("RedundantEmptyInitializerBlock")
 class MethodWriter(
     val classReader: ClassReader,
     context: Context,
     val level: Options.DisplayLevel,
     val lines_locals: Boolean,
+    val instructions: Boolean,
 ) : Context() {
     companion object {
 
@@ -31,13 +33,28 @@ class MethodWriter(
                 METHOD_ACCESS_FLAG_ACC_PRIVATE to "private ",
                 METHOD_ACCESS_FLAG_ACC_PUBLIC to "public ")
 
+        fun isAccessFlag(magic_number: Int, accessFlags: Int): Boolean {
+            var cpy = accessFlags
+            jvmMethodAccessFlags.forEach {
+                with(it) {
+                    if (cpy >= first) {
+                        if (first == magic_number) {
+                            return true
+                        }
+                        cpy -= first
+                    }
+                }
+            }
+            return false
+        }
+
         @JvmStatic
         fun methodAccessFlags(accessFlags: Int): String {
             var cpy = accessFlags
             val sb = StringBuilder()
             jvmMethodAccessFlags.forEach {
                 with(it) {
-                    if (cpy > first) {
+                    if (cpy >= first) {
                         cpy -= first
                         sb.append(second)
                     }
@@ -50,32 +67,51 @@ class MethodWriter(
     val task = DecompileTask.instance(context)
 
     init {
-        if (context[MethodWriter::class] == null) {
-            context[MethodWriter::class] = this
+        // finish later.
+    }
+
+    fun process() = classReader.methodTable.forEach {
+        with(processMethod(it)) {
+            if (this.isNotEmpty())
+                task.report(this)
         }
     }
 
-    fun process() {
-
-    }
-
+    @Suppress("MemberVisibilityCanBePrivate")
     internal fun processMethod(method: MethodInfo): String {
-        val sb = StringBuilder()
         with(classReader) {
-            with(sb) {
-                append(method.getJVMName())
+            val requiredLevel: Options.DisplayLevel =
+                if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PUBLIC, method.accessFlags))
+                    Options.DisplayLevel.PUBLIC
+                else if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PROTECTED, method.accessFlags))
+                    Options.DisplayLevel.PROTECTED
+                else if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PRIVATE, method.accessFlags))
+                    Options.DisplayLevel.PRIVATE
+                else Options.DisplayLevel.PACKAGE
+            if (level.ordinal >= requiredLevel.ordinal) {
+                val sb = StringBuilder()
+                with(sb) {
+                    append(method.getReadableName())
+                    if (lines_locals) {
+
+                    }
+                    if (instructions) {
+
+                    }
+                    return sb.toString()
+                }
             }
         }
-        TODO()
+        return ""
     }
 
-    private fun getUtf(index: Int): String = (classReader.cpInfo[index] as ConstUtf8Info).utf8
+    private fun getUtf(index: Int): String = (classReader.cpInfo[index - 1] as ConstUtf8Info).utf8
 
     private fun MethodInfo.getJVMName(): String = "${getUtf(nameIndex)}${getUtf(descriptorIndex)}"
 
     private fun MethodInfo.getReadableName(): String {
         val descriptor = FileProcessor.parseTypeDescriptor(getUtf(descriptorIndex))
-        return methodAccessFlags(accessFlags) + descriptor.second + getUtf(nameIndex) + descriptor.first
+        return methodAccessFlags(accessFlags) + descriptor.second + " " + getUtf(nameIndex) + descriptor.first
     }
 
     fun indexOf(full_qualified_name: String): Int {

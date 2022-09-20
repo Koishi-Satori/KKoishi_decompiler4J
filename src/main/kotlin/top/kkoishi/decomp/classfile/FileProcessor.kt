@@ -29,6 +29,7 @@ class FileProcessor(val context: Context) {
         @JvmStatic
         fun main(args: Array<String>) {
             println(parseTypeDescriptor("([[IIJLjava/lang/String;[B)V"))
+            println(parseTypeDescriptor("[[Lsun.misc.Unsafe"))
         }
 
         /**
@@ -90,8 +91,10 @@ class FileProcessor(val context: Context) {
                         while (rest.hasNext()) {
                             val lookup = rest.nextChar()
                             if (lookup == ')') {
-                                val last = buf.length - 1
-                                buf.deleteRange(last - 1, last)
+                                if (buf.last() != '(') {
+                                    val last = buf.length
+                                    buf.deleteRange(last - 2, last)
+                                }
                                 buf.append(')')
                                 break
                             }
@@ -151,10 +154,10 @@ class FileProcessor(val context: Context) {
                     @Suppress("UNCHECKED_CAST") val data = this.data() as Array<ByteArray>
                     val nameIndex = data[0].toShort().toInt()
                     val descriptorIndex = data[1].toShort().toInt()
-                    sb.append('#').append(nameIndex).append(".#")
+                    sb.append('#').append(nameIndex).append('#')
                         .append(descriptorIndex).append("\t\t\t//")
-                        .append((context.cpInfo[nameIndex] as ConstUtf8Info).utf8).append('.')
-                        .append((context.cpInfo[descriptorIndex] as ConstUtf8Info).utf8)
+                        .append((context.cpInfo[nameIndex - 1] as ConstUtf8Info).utf8)
+                        .append((context.cpInfo[descriptorIndex - 1] as ConstUtf8Info).utf8)
                 }
                 CONSTANT_FIELDREF_INFO, CONSTANT_METHODREF_INFO, CONSTANT_INTERFACE_METHODREF -> {
                     // Report the CONSTANT_Class_info and CONSTANT_NameAndType_info.
@@ -164,13 +167,13 @@ class FileProcessor(val context: Context) {
                     sb.append('#').append(classIndex).append(".#")
                         .append(nameAndTypeIndex).append("\t\t\t//")
                     with(context) {
-                        val classInfo = cpInfo[classIndex]
+                        val classInfo = cpInfo[classIndex - 1]
                         @Suppress("UNCHECKED_CAST") val datum =
-                            cpInfo[nameAndTypeIndex].data() as Array<ByteArray>
-                        sb.append((cpInfo[(classInfo.data() as ByteArray).toShort().toInt()]
+                            cpInfo[nameAndTypeIndex - 1].data() as Array<ByteArray>
+                        sb.append((cpInfo[(classInfo.data() as ByteArray).toShort().toInt() - 1]
                                 as ConstUtf8Info).utf8).append('.')
-                            .append((cpInfo[datum[0].toShort().toInt()] as ConstUtf8Info).utf8)
-                            .append('.').append((cpInfo[datum[1].toShort().toInt()]
+                            .append((cpInfo[datum[0].toShort().toInt() - 1] as ConstUtf8Info).utf8)
+                            .append('.').append((cpInfo[datum[1].toShort().toInt() - 1]
                                     as ConstUtf8Info).utf8)
                     }
                 }
@@ -180,7 +183,7 @@ class FileProcessor(val context: Context) {
                 CONSTANT_METHOD_TYPE_INFO -> {
                     val descriptorIndex = (this.data() as ByteArray).toShort().toInt()
                     sb.append('#').append(descriptorIndex).append("\t\t\t//")
-                        .append((context.cpInfo[descriptorIndex] as ConstUtf8Info).utf8)
+                        .append((context.cpInfo[descriptorIndex - 1] as ConstUtf8Info).utf8)
                 }
                 CONSTANT_DYNAMIC -> {
 
@@ -191,7 +194,7 @@ class FileProcessor(val context: Context) {
                 CONSTANT_MODULE, CONSTANT_PACKAGE -> {
                     val nameIndex = (this.data() as ByteArray).toShort().toInt()
                     sb.append('#').append(nameIndex).append("\t\t\t//")
-                        .append((context.cpInfo[nameIndex] as ConstUtf8Info).utf8)
+                        .append((context.cpInfo[nameIndex - 1] as ConstUtf8Info).utf8)
                 }
             }
             return sb.toString()
@@ -211,7 +214,7 @@ class FileProcessor(val context: Context) {
         @JvmStatic
         fun ByteArray.toShort(): Short =
             (((this[0].toInt() and 0xff) shl 8) +
-                    (this[0].toInt() and 0xff)).toShort()
+                    (this[1].toInt() and 0xff)).toShort()
     }
 
     fun process(name: String, remains: Iterator<String>) {
@@ -245,10 +248,7 @@ class FileProcessor(val context: Context) {
         val p = Path.of(name)
         val cr = ClassReader(p.readBytes())
         cr.read()
-        task.report("${
-            task.getMessage("main.files.report",
-                p.toAbsolutePath().fileName)
-        }\nLastModified time:${p.getLastModifiedTime()}")
+        task.report("${task.getMessage("main.files.report", p.toRealPath())}\nLastModified time:${p.getLastModifiedTime()}")
         // Report class file attributes
         for (attr in cr.classFileAttributeTable) {
             val name = (cr.cpInfo[attr.attributeNameIndex] as ConstUtf8Info).utf8
@@ -267,24 +267,26 @@ class FileProcessor(val context: Context) {
                 "Deprecated" -> task.report("\tThis class is deprecated.")
             }
         }
+        //ClassReader.report(cr)
         task.report(task.getMessage("main.class.head",
             Utils.parseClassAccessFlags(cr.accessFlags),
             ((cr.cpInfo[(cr.cpInfo[cr.thisClassIndex.toShort()
-                .toInt()] as ConstClassInfo).index]) as ConstUtf8Info).utf8))
+                .toInt() - 1] as ConstClassInfo).index - 1]) as ConstUtf8Info).utf8))
         // Use this method to report constant pool
         fun reportConstantPool() {
-            task.report("Constant Pool:\n")
+            task.report("Constant Pool:")
             cr.cpInfo.withIndex().forEach { (index, info) -> task.report(info.report(index, cr)) }
         }
 
         val mw: MethodWriter = if (Options.verbose) {
             reportConstantPool()
-            MethodWriter(cr, context, Options.DisplayLevel.PRIVATE, true)
+            MethodWriter(cr, context, Options.DisplayLevel.PRIVATE, lines_locals = true, instructions = true)
         } else {
             if (Options.constants)
                 reportConstantPool()
-            MethodWriter(cr, context, Options.level, Options.lines_locals)
+            MethodWriter(cr, context, Options.level, Options.lines_locals, Options.instructions)
         }
+        mw.process()
     }
 
     private fun innerClassInfo(name: String, accessFlags: Int): String {
