@@ -35,12 +35,14 @@ class MethodWriter(
         fun methodAccessFlags(accessFlags: Int): String {
             var cpy = accessFlags
             val sb = StringBuilder()
-            jvmMethodAccessFlags.forEach { with(it) {
-                if (cpy > first) {
-                    cpy -= first
-                    sb.append(second)
+            jvmMethodAccessFlags.forEach {
+                with(it) {
+                    if (cpy > first) {
+                        cpy -= first
+                        sb.append(second)
+                    }
                 }
-            } }
+            }
             return sb.toString()
         }
     }
@@ -61,7 +63,7 @@ class MethodWriter(
         val sb = StringBuilder()
         with(classReader) {
             with(sb) {
-                append(methodAccessFlags(method.accessFlags)).append(method.getJVMName())
+                append(method.getJVMName())
             }
         }
         TODO()
@@ -72,7 +74,8 @@ class MethodWriter(
     private fun MethodInfo.getJVMName(): String = "${getUtf(nameIndex)}${getUtf(descriptorIndex)}"
 
     private fun MethodInfo.getReadableName(): String {
-        TODO()
+        val descriptor = FileProcessor.parseTypeDescriptor(getUtf(descriptorIndex))
+        return methodAccessFlags(accessFlags) + descriptor.second + getUtf(nameIndex) + descriptor.first
     }
 
     fun indexOf(full_qualified_name: String): Int {

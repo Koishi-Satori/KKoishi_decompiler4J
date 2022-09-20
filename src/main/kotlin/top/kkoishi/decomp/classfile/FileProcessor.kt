@@ -8,7 +8,6 @@ import top.kkoishi.cv4j.DecompilerException
 import top.kkoishi.cv4j.attr.InnerClassAttribute
 import top.kkoishi.cv4j.attr.SourceFileAttribute
 import top.kkoishi.cv4j.cp.ConstClassInfo
-import top.kkoishi.cv4j.cp.ConstNameAndTypeInfo
 import top.kkoishi.cv4j.cp.ConstUtf8Info
 import top.kkoishi.decomp.*
 import java.nio.file.Path
@@ -29,7 +28,7 @@ class FileProcessor(val context: Context) {
 
         @JvmStatic
         fun main(args: Array<String>) {
-            println(parseTypeDescriptor("[[[[[Ljava/lang/String;"))
+            println(parseTypeDescriptor("([[IIJLjava/lang/String;[B)V"))
         }
 
         /**
@@ -52,20 +51,20 @@ class FileProcessor(val context: Context) {
                     return when (this) {
                         // Full qualified name.
                         'L' -> {
-                            val sb = StringBuilder()
+                            val buf = StringBuilder()
                             while (rest.hasNext()) {
-                                val cur = rest.nextChar()
-                                if (cur == ';') {
-                                    sb.append(';')
+                                val lookup = rest.nextChar()
+                                if (lookup == ';') {
+                                    buf.append(';')
                                     break
-                                } else if (cur == '/')
-                                    sb.append('.')
+                                } else if (lookup == '/')
+                                    buf.append('.')
                                 else
-                                    sb.append(cur)
+                                    buf.append(lookup)
                             }
-                            if (sb.last() != ';')
-                                throw DecompilerException("The class full qualified name $sb is invalid.")
-                            sb.deleteAt(sb.length - 1).toString()
+                            if (buf.last() != ';')
+                                throw DecompilerException("The class full qualified name $buf is invalid.")
+                            buf.deleteAt(buf.length - 1).toString()
                         }
                         'I' -> "int"
                         'J' -> "long"
@@ -86,10 +85,25 @@ class FileProcessor(val context: Context) {
                 }
                 if (first == '(') {
                     // Consider the second case.
-
-                } else {
+                    if (rest.hasNext()) {
+                        val buf = StringBuilder("(")
+                        while (rest.hasNext()) {
+                            val lookup = rest.nextChar()
+                            if (lookup == ')') {
+                                val last = buf.length - 1
+                                buf.deleteRange(last - 1, last)
+                                buf.append(')')
+                                break
+                            }
+                            buf.append(lookup.parseImpl(rest)).append(", ")
+                        }
+                        if (buf.last() == ')' && rest.hasNext()) {
+                            return buf.toString() to rest.nextChar().parseImpl(rest)
+                        }
+                    }
+                    throw DecompilerException("The quote of descriptor is not closed or there is no return type descriptor.")
+                } else
                     return first.parseImpl(rest) to null
-                }
             }
             throw DecompilerException("The descriptor is empty!")
         }
