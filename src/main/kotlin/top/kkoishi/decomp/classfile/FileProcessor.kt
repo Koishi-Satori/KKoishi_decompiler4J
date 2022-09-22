@@ -231,13 +231,7 @@ class FileProcessor(val context: Context) {
                 }
             }
         }
-        try {
-            processFile(name)
-        } catch (e: DecompilerException) {
-            throw e
-        } catch (e1: Exception) {
-            throw IllegalArgumentException()
-        }
+        task.classes.addLast(name)
     }
 
     fun processFile(name: String) {

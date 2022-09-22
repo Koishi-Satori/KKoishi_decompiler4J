@@ -172,16 +172,40 @@ class ResourceException : Exception {
     constructor(cause: Throwable?) : super(cause)
 }
 
+/**
+ * Option is used to parse command line arguments.
+ *
+ * All the valid arguments will be stored as Option instance in
+ * *Options.recognizedOptions*, and when handle the program arguments
+ * we simply traversal that array and invoke matches method. If true,
+ * we invoke the process method to process the argument(s).
+ *
+ * @param hasArg if the option has other arguments.
+ * @param _aliases allowed arguments.
+ * @author KKoishi_
+ */
 abstract class Option(val hasArg: Boolean, vararg _aliases: String) {
+    /**
+     * Allowed arguments.
+     */
     @Suppress("UNCHECKED_CAST")
     val aliases: Array<String> = _aliases as Array<String>
+
+    /**
+     * Implement this method to process the argument.
+     */
     abstract fun process(task: DecompileTask, opt: String, arg: String?)
+
+    /**
+     * Check if an argument matches this option.
+     */
     open fun matches(opt: String): Boolean {
         for (e in aliases) if (opt == e) return true
         return false
     }
 }
 
+@Deprecated("This class is not used currectly.")
 class LogWriter constructor(
     val clz: KClass<*>,
     var logLevel: System.Logger.Level,
@@ -241,7 +265,18 @@ class LogWriter constructor(
     }
 }
 
+/**
+ * The context class for getting class instance rapidly.
+ * You can use *Context.get(KClass<*>)* method to get instance.
+ *
+ * And some class will implement a static method "instance" for the same propose.
+ *
+ * @author KKoishi_
+ */
 open class Context {
+    /**
+     * The map stores KClass and instance entries.
+     */
     protected val map: HashMap<KClass<*>, Any> = HashMap()
 
     @Suppress("UNCHECKED_CAST")
@@ -253,26 +288,97 @@ open class Context {
     operator fun <T> set(key: KClass<T>, value: T): T where T : Any = put(key, value)
 }
 
+/**
+ * Simple interface defined how to get message and format them.
+ *
+ * @author KKoishi_
+ * @see DecompileTask
+ */
 interface Messages {
+    /**
+     * Get message format pattern from the given key and default locale, then format the pattern using
+     * the given arguments.
+     *
+     * @param key the key of the pattern in ResourceBundle.
+     * @param args the arguments.
+     */
     fun getMessage(key: String, vararg args: Any?): String
 
+    /**
+     * Get the message format pattern from the given key and locale, the format the pattern
+     * using the given arguments.
+     *
+     * @param locale the Locale of ResourceBundle.
+     * @param key the key of the pattern in ResourceBundle.
+     * @param args the arguments.
+     */
     fun getMessage(locale: Locale, key: String, vararg args: Any?): String
 }
 
-class DecompileTask @JvmOverloads constructor(val locale: Locale = Utils.getLocale()) : Context(), Messages {
-    private val classes: ArrayDeque<String> = ArrayDeque(8)
+/**
+ * This class is used to parse arguments and control the decompile process.
+ * The default locale is defined in the file **./data/property.json** and its
+ * initialized value is en_US.
+ *
+ * The locale is used to load the ResourceBundle for *getMessage(Locale, String, varargs Any?)*
+ * method. And this method is used to get the messages to report.
+ *
+ * After processing the program arguments, a *FileProcessor* instance will be initialized for
+ * decompiling the class files.
+ * The main method will invoke the *run(Array<String>)* method in this class.
+ *
+ * @author KKoishi_
+ */
+class DecompileTask @JvmOverloads constructor(
+    /**
+     * The locale used to load the ResourceBundle.
+     *
+     * @see getMessage
+     */
+    val locale: Locale = Utils.getLocale()
+) : Context(), Messages {
+    /**
+     * The classes waiting to be processed.
+     */
+    internal val classes: ArrayDeque<String> = ArrayDeque(8)
+
+    /**
+     * Store messages for different Locale.
+     */
     val bundles: HashMap<Locale, ResourceBundle> = HashMap()
+
+    /**
+     * The FileProcessor instance will process the class files in ```classes```.
+     */
     val processer = FileProcessor(this)
 
+    /**
+     * Bad argument exception.
+     *
+     * @author KKoishi_
+     */
     class BadArg internal constructor(
+        /**
+         * The key of message format.
+         */
         internal val key: String,
         msg: String,
         vararg _args: Any?,
     ) : Exception(msg) {
+        /**
+         * The arguments of message format.
+         */
         @Suppress("UNCHECKED_CAST")
         internal val args: Array<String> = _args as Array<String>
+
+        /**
+         * After capture this exception if it is needed to show usage.
+         */
         internal var needShowUsage = false
 
+        /**
+         * Set if it is needed to show usage after this is captured.
+         */
         fun showUsage(v: Boolean): BadArg {
             needShowUsage = v
             return this
@@ -305,6 +411,9 @@ class DecompileTask @JvmOverloads constructor(val locale: Locale = Utils.getLoca
          */
         const val EXIT_ABNORMAL = 4
 
+        /**
+         * Get the DecompileTask instance from context.
+         */
         @JvmStatic
         fun instance(context: Context): DecompileTask = context[DecompileTask::class] ?: DecompileTask()
     }
@@ -400,5 +509,5 @@ class DecompileTask @JvmOverloads constructor(val locale: Locale = Utils.getLoca
 
     fun reportError(errKey: String, vararg args: String) = System.err.println(getMessage(errKey, *args))
 
-    fun report(msg: String) = System.out.println(msg.replace("\n", Utils.nl, false).replace("\t", "    ", false))
+    fun report(msg: String) = println(msg.replace("\n", Utils.nl, false).replace("\t", "    ", false))
 }

@@ -5,4 +5,7 @@ public final class TestClz {
                 System.out.println(arg);
         }
     }
+
+    private void p() {
+    }
 }

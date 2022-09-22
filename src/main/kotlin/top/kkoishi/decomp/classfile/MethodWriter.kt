@@ -1,8 +1,10 @@
 package top.kkoishi.decomp.classfile
 
+import top.kkoishi.cv4j.Bytecodes
 import top.kkoishi.cv4j.ClassReader
 import top.kkoishi.cv4j.ClassReader.*
 import top.kkoishi.cv4j.MethodInfo
+import top.kkoishi.cv4j.attr.CodeAttribute
 import top.kkoishi.cv4j.cp.ConstUtf8Info
 import top.kkoishi.decomp.Context
 import top.kkoishi.decomp.DecompileTask
@@ -92,10 +94,24 @@ class MethodWriter(
                 val sb = StringBuilder()
                 with(sb) {
                     append(method.getReadableName())
-                    if (lines_locals) {
-
+                    // Find CodeAttribute first.
+                    var codeAttr: CodeAttribute? = null
+                    for (attribute in method.attributes) {
+                        if (getUtf(attribute.attributeNameIndex) == "Code") {
+                            codeAttr = attribute as CodeAttribute
+                            break
+                        }
+                    }
+                    if (codeAttr == null) {
+                        throw ExceptionInInitializerError("Can not access the CodeAttribute in method ${method.getJVMName()}.")
                     }
                     if (instructions) {
+                        val instructions = Bytecodes.getJvm_instructions_array()
+                        for (b in codeAttr.code) {
+                            //TODO: finish read.
+                        }
+                    }
+                    if (lines_locals) {
 
                     }
                     return sb.toString()
