@@ -7,6 +7,7 @@ import top.kkoishi.cv4j.DecompilerException
 import top.kkoishi.decomp.classfile.FileProcessor
 import top.kkoishi.proc.json.JsonParser
 import top.kkoishi.proc.json.MappedJsonObject
+import java.io.IOException
 import java.io.PrintWriter
 import java.nio.file.Path
 import java.text.DateFormat
@@ -17,6 +18,9 @@ import kotlin.io.path.readText
 import kotlin.reflect.KClass
 
 object Utils {
+    @JvmStatic
+    val programName = "kkemp"
+
     @JvmStatic
     val jsonMaps = HashMap<String, MappedJsonObject>()
 
@@ -55,12 +59,14 @@ object Utils {
     fun parseClassAccessFlags(accessFlags: Int): String {
         var cpy = accessFlags
         val buf = StringBuilder()
-        classAccessFlags.forEach { with(it) {
-            if (cpy >= first) {
-                cpy -= first
-                buf.append(second)
+        classAccessFlags.forEach {
+            with(it) {
+                if (cpy >= first) {
+                    cpy -= first
+                    buf.append(second)
+                }
             }
-        } }
+        }
         return buf.toString()
     }
 }
@@ -123,7 +129,7 @@ object Options {
                 }
             }
         },
-        object : Option(false, "-l") {
+        object : Option(false, "-l", "-locals") {
             override fun process(task: DecompileTask, opt: String, arg: String?) {
                 lines_locals = true
             }
@@ -139,6 +145,18 @@ object Options {
             }
 
         })
+
+    var argumentUsageKeys: Array<String> = arrayOf("help",
+        "version",
+        "sysinfo",
+        "constants",
+        "private",
+        "package",
+        "protected",
+        "public",
+        "locals",
+        "verbose",
+        "instruction")
 
     @JvmStatic
     var help = false
@@ -202,6 +220,12 @@ abstract class Option(val hasArg: Boolean, vararg _aliases: String) {
     open fun matches(opt: String): Boolean {
         for (e in aliases) if (opt == e) return true
         return false
+    }
+
+    override fun toString(): String {
+        val sb = StringBuilder()
+        aliases.forEach { sb.append(it).append(' ') }
+        return sb.deleteAt(sb.length - 1).toString()
     }
 }
 
@@ -335,7 +359,7 @@ class DecompileTask @JvmOverloads constructor(
      *
      * @see getMessage
      */
-    val locale: Locale = Utils.getLocale()
+    val locale: Locale = Utils.getLocale(),
 ) : Context(), Messages {
     /**
      * The classes waiting to be processed.
@@ -439,6 +463,10 @@ class DecompileTask @JvmOverloads constructor(
     }
 
     fun run(args: Array<String>): Int {
+        if (args.isEmpty()) {
+            showUsage()
+            return EXIT_OK
+        }
         try {
             handleArguments(args)
         } catch (de: DecompilerException) {
@@ -453,8 +481,9 @@ class DecompileTask @JvmOverloads constructor(
         } catch (re: ResourceException) {
             re.printStackTrace(System.err)
             return EXIT_SYSTEM_ERR
-        } catch (oe: IndexOutOfBoundsException) {
+        } catch (oe: IOException) {
             oe.printStackTrace(System.err)
+            reportError("err.files.common")
             return EXIT_SYSTEM_ERR
         } catch (e: Exception) {
             e.printStackTrace(System.err)
@@ -464,7 +493,14 @@ class DecompileTask @JvmOverloads constructor(
     }
 
     fun showUsage() {
-
+        report(getMessage("main.usage.common", Utils.programName))
+        Options.recognizedOptions.withIndex().forEach {
+            with(it) {
+                report(getMessage("main.usage.desc",
+                    it.value.toString(),
+                    getMessage("main.args.${Options.argumentUsageKeys[index]}")))
+            }
+        }
     }
 
     fun handleArguments(args: Array<String>) = handleArguments(args.iterator(), true)
