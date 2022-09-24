@@ -19,22 +19,54 @@ class MethodWriter(
     val instructions: Boolean,
 ) : Context() {
     companion object {
+        const val SIGNATURE_PERMISSION: Byte = 0x00
+        const val SIGNATURE_HIGH: Byte = 0x01
+        const val SIGNATURE_MID: Byte = 0x02
+        const val SIGNATURE_LOW: Byte = 0x03
+        const val SIGNATURE_HIDE: Byte = 0x0f
+
+        internal enum class MethodAccess(val identifiedName: String, val signature: Byte) {
+            SYNTHETIC("synthetic", SIGNATURE_HIDE),
+            STRICT("strictfp", SIGNATURE_LOW),
+            ABSTRACT("abstract", SIGNATURE_MID),
+            NATIVE("native", SIGNATURE_MID),
+            VARARGS("varargs", SIGNATURE_HIDE),
+            BRIDGE("bridge", SIGNATURE_HIDE),
+            SYNCHRONIZED("synchronized", SIGNATURE_LOW),
+            FINAL("final", SIGNATURE_MID),
+            STATIC("static", SIGNATURE_MID),
+            PROTECTED("protected", SIGNATURE_HIGH),
+            PRIVATE("private", SIGNATURE_HIGH),
+            PUBLIC("public", SIGNATURE_HIGH);
+
+            companion object {
+                internal fun cmp(): Comparator<MethodAccess> {
+                    return Comparator { o1, o2 ->
+                        if (o1.signature == o2.signature)
+                            o1.ordinal - o2.ordinal
+                        else
+                            o1.signature - o2.signature
+                    }
+                }
+            }
+        }
 
         @JvmStatic
-        private val jvmMethodAccessFlags: Array<Pair<Int, String>> =
-            arrayOf(METHOD_ACCESS_FLAG_ACC_SYNTHETIC to "synthetic ",
-                METHOD_ACCESS_FLAG_ACC_STRICT to "strictfp ",
-                METHOD_ACCESS_FLAG_ACC_ABSTRACT to "abstract ",
-                METHOD_ACCESS_FLAG_ACC_NATIVE to "native ",
-                METHOD_ACCESS_FLAG_ACC_VARARGS to "varargs ",
-                METHOD_ACCESS_FLAG_ACC_BRIDGE to "bridge ",
-                METHOD_ACCESS_FLAG_ACC_SYNCHRONIZED to "synchronized ",
-                METHOD_PARAMETERS_ACC_FINAL to "final ",
-                METHOD_ACCESS_FLAG_ACC_STATIC to "static ",
-                METHOD_ACCESS_FLAG_ACC_PROTECTED to "protected ",
-                METHOD_ACCESS_FLAG_ACC_PRIVATE to "private ",
-                METHOD_ACCESS_FLAG_ACC_PUBLIC to "public ")
+        private val jvmMethodAccessFlags: Array<Pair<Int, MethodAccess>> =
+            arrayOf(METHOD_ACCESS_FLAG_ACC_SYNTHETIC to MethodAccess.SYNTHETIC,
+                METHOD_ACCESS_FLAG_ACC_STRICT to MethodAccess.STRICT,
+                METHOD_ACCESS_FLAG_ACC_ABSTRACT to MethodAccess.ABSTRACT,
+                METHOD_ACCESS_FLAG_ACC_NATIVE to MethodAccess.NATIVE,
+                METHOD_ACCESS_FLAG_ACC_VARARGS to MethodAccess.VARARGS,
+                METHOD_ACCESS_FLAG_ACC_BRIDGE to MethodAccess.BRIDGE,
+                METHOD_ACCESS_FLAG_ACC_SYNCHRONIZED to MethodAccess.SYNCHRONIZED,
+                METHOD_PARAMETERS_ACC_FINAL to MethodAccess.FINAL,
+                METHOD_ACCESS_FLAG_ACC_STATIC to MethodAccess.STATIC,
+                METHOD_ACCESS_FLAG_ACC_PROTECTED to MethodAccess.PROTECTED,
+                METHOD_ACCESS_FLAG_ACC_PRIVATE to MethodAccess.PRIVATE,
+                METHOD_ACCESS_FLAG_ACC_PUBLIC to MethodAccess.PUBLIC)
 
+        @JvmStatic
         fun isAccessFlag(magic_number: Int, accessFlags: Int): Boolean {
             var cpy = accessFlags
             jvmMethodAccessFlags.forEach {
@@ -51,18 +83,43 @@ class MethodWriter(
         }
 
         @JvmStatic
-        fun methodAccessFlags(accessFlags: Int): String {
-            var cpy = accessFlags
-            val sb = StringBuilder()
-            jvmMethodAccessFlags.forEach {
-                with(it) {
-                    if (cpy >= first) {
-                        cpy -= first
-                        sb.append(second)
-                    }
+        @Suppress("LocalVariableName")
+        internal fun methodAccessArray(accessFlags: Int): ArrayDeque<MethodAccess> {
+            val res: ArrayDeque<MethodAccess> = ArrayDeque(5)
+            var _accessFlags = accessFlags
+            for (acc in jvmMethodAccessFlags) {
+                if (_accessFlags >= acc.first) {
+                    _accessFlags -= acc.first
+                    res.addLast(acc.second)
                 }
             }
-            return sb.toString()
+            return res
+        }
+
+        @JvmStatic
+        private fun methodAccessFlags0(accessFlags: ArrayDeque<MethodAccess>): ArrayDeque<MethodAccess> {
+            val res: ArrayDeque<MethodAccess> = ArrayDeque(accessFlags.size)
+            for (acc in accessFlags) {
+                if (acc.signature < SIGNATURE_HIDE) {
+                    res.addLast(acc)
+                }
+            }
+            res.sortWith(MethodAccess.cmp())
+            return res
+        }
+
+        @JvmStatic
+        fun methodAccessFlags(accessFlags: Int): String {
+            val rest = methodAccessFlags0(methodAccessArray(accessFlags)).iterator()
+            if (!rest.hasNext()) {
+                return ""
+            }
+            val buf = StringBuilder()
+            while (true) {
+                buf.append(rest.next().identifiedName).append(' ')
+                if (!rest.hasNext())
+                    return buf.toString()
+            }
         }
     }
 
@@ -93,7 +150,9 @@ class MethodWriter(
             if (level.ordinal >= requiredLevel.ordinal) {
                 val sb = StringBuilder()
                 with(sb) {
-                    append(method.getReadableName())
+                    append(method.getReadableName()).append("\n\t")
+                    append("Method Access Flags:\n")
+                    methodAccessArray(method.accessFlags).forEach { append("\t\tACC_").append(it.name).append('\n') }
                     // Find CodeAttribute first.
                     var codeAttr: CodeAttribute? = null
                     for (attribute in method.attributes) {
