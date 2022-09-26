@@ -514,6 +514,7 @@ class DecompileTask @JvmOverloads constructor(
                 classes.addLast(arg)
             } else throw getBadArg("err.options.unknown", arg).showUsage(true)
         }
+        run0()
         if (classes.isNotEmpty())
             classes.forEach(processer::processFile)
     }
@@ -539,6 +540,12 @@ class DecompileTask @JvmOverloads constructor(
             throw de
         }
         throw getBadArg("err.options.unknown", arg)
+    }
+
+    fun run0() {
+        if (Options.help) {
+            showUsage()
+        }
     }
 
     fun getBadArg(key: String, vararg args: String?) = BadArg(key, getMessage(key, args), args)

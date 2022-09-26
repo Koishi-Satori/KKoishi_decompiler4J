@@ -25,19 +25,19 @@ class MethodWriter(
         const val SIGNATURE_LOW: Byte = 0x03
         const val SIGNATURE_HIDE: Byte = 0x0f
 
-        internal enum class MethodAccess(val identifiedName: String, val signature: Byte) {
-            SYNTHETIC("synthetic", SIGNATURE_HIDE),
+        internal enum class MethodAccess constructor(val identifiedName: String, val signature: Byte = SIGNATURE_HIDE) {
+            SYNTHETIC("synthetic"),
             STRICT("strictfp", SIGNATURE_LOW),
-            ABSTRACT("abstract", SIGNATURE_MID),
+            ABSTRACT("abstract", SIGNATURE_HIGH),
             NATIVE("native", SIGNATURE_MID),
-            VARARGS("varargs", SIGNATURE_HIDE),
-            BRIDGE("bridge", SIGNATURE_HIDE),
-            SYNCHRONIZED("synchronized", SIGNATURE_LOW),
-            FINAL("final", SIGNATURE_MID),
-            STATIC("static", SIGNATURE_MID),
-            PROTECTED("protected", SIGNATURE_HIGH),
-            PRIVATE("private", SIGNATURE_HIGH),
-            PUBLIC("public", SIGNATURE_HIGH);
+            VARARGS("varargs"),
+            BRIDGE("bridge"),
+            SYNCHRONIZED("synchronized", SIGNATURE_MID),
+            FINAL("final", SIGNATURE_HIGH),
+            STATIC("static", SIGNATURE_HIGH),
+            PROTECTED("protected", SIGNATURE_PERMISSION),
+            PRIVATE("private", SIGNATURE_PERMISSION),
+            PUBLIC("public", SIGNATURE_PERMISSION);
 
             companion object {
                 internal fun cmp(): Comparator<MethodAccess> {

@@ -4,6 +4,9 @@
       <root url="jar://$PROJECT_DIR$/lib/ClassView4J.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <SOURCES />
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/../ClassView4J/src/main/java" />
+      <root url="file://$PROJECT_DIR$/../ClassView4J/src/main/java" />
+    </SOURCES>
   </library>
 </component>
