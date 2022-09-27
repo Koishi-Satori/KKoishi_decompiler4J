@@ -5,8 +5,8 @@
     </CLASSES>
     <JAVADOC />
     <SOURCES>
-      <root url="file://$PROJECT_DIR$/../ClassView4J/src/main/java" />
-      <root url="file://$PROJECT_DIR$/../ClassView4J/src/main/java" />
+      <root url="jar://$PROJECT_DIR$/lib_src/ClassView4J_resource.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib_src/ClassView4J_resource.jar!/" />
     </SOURCES>
   </library>
 </component>

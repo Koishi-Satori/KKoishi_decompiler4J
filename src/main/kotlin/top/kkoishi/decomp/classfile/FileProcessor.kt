@@ -242,7 +242,10 @@ class FileProcessor(val context: Context) {
         val p = Path.of(name)
         val cr = ClassReader(p.readBytes())
         cr.read()
-        task.report("${task.getMessage("main.files.report", p.toRealPath())}\nLastModified time:${p.getLastModifiedTime()}")
+        task.report("${
+            task.getMessage("main.files.report",
+                p.toRealPath())
+        }\nLastModified time:${p.getLastModifiedTime()}")
         // Report class file attributes
         for (attr in cr.classFileAttributeTable) {
             val name = (cr.cpInfo[attr.attributeNameIndex] as ConstUtf8Info).utf8
@@ -272,13 +275,19 @@ class FileProcessor(val context: Context) {
             cr.cpInfo.withIndex().forEach { (index, info) -> task.report(info.report(index, cr)) }
         }
 
-        val mw: MethodWriter = if (Options.verbose) {
+        if (Options.constants || Options.verbose)
             reportConstantPool()
-            MethodWriter(cr, context, Options.DisplayLevel.PRIVATE, lines_locals = true, instructions = true)
+
+        val fw: FieldWriter = if (Options.verbose)
+            FieldWriter(cr, context, Options.DisplayLevel.PRIVATE, access = true)
+        else
+            FieldWriter(cr, context, Options.level, Options.access)
+        fw.process()
+
+        val mw: MethodWriter = if (Options.verbose) {
+            MethodWriter(cr, context, Options.DisplayLevel.PRIVATE, lines_locals = true, instructions = true, access = true)
         } else {
-            if (Options.constants)
-                reportConstantPool()
-            MethodWriter(cr, context, Options.level, Options.lines_locals, Options.instructions)
+            MethodWriter(cr, context, Options.level, Options.lines_locals, Options.instructions, Options.access)
         }
         mw.process()
     }

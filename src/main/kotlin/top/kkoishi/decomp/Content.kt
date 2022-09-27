@@ -143,7 +143,11 @@ object Options {
             override fun process(task: DecompileTask, opt: String, arg: String?) {
                 instructions = true
             }
-
+        },
+        object : Option(false, "-access", "-a", "-acc") {
+            override fun process(task: DecompileTask, opt: String, arg: String?) {
+                access = true
+            }
         })
 
     var argumentUsageKeys: Array<String> = arrayOf("help",
@@ -156,7 +160,8 @@ object Options {
         "public",
         "locals",
         "verbose",
-        "instruction")
+        "instruction",
+        "access")
 
     @JvmStatic
     var help = false
@@ -181,6 +186,9 @@ object Options {
 
     @JvmStatic
     var instructions = false
+
+    @JvmStatic
+    var access = false
 }
 
 class ResourceException : Exception {

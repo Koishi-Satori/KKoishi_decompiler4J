@@ -1,6 +1,5 @@
 package top.kkoishi.decomp.classfile
 
-import top.kkoishi.cv4j.Bytecodes
 import top.kkoishi.cv4j.ClassReader
 import top.kkoishi.cv4j.ClassReader.*
 import top.kkoishi.cv4j.MethodInfo
@@ -9,6 +8,7 @@ import top.kkoishi.cv4j.cp.ConstUtf8Info
 import top.kkoishi.decomp.Context
 import top.kkoishi.decomp.DecompileTask
 import top.kkoishi.decomp.Options
+import top.kkoishi.decomp.classfile.FileProcessor.Companion.parseTypeDescriptor
 
 @Suppress("RedundantEmptyInitializerBlock")
 class MethodWriter(
@@ -17,6 +17,7 @@ class MethodWriter(
     val level: Options.DisplayLevel,
     val lines_locals: Boolean,
     val instructions: Boolean,
+    val access: Boolean
 ) : Context() {
     companion object {
         const val SIGNATURE_PERMISSION: Byte = 0x00
@@ -138,46 +139,53 @@ class MethodWriter(
 
     @Suppress("MemberVisibilityCanBePrivate")
     internal fun processMethod(method: MethodInfo): String {
-        with(classReader) {
+        with(method) {
             val requiredLevel: Options.DisplayLevel =
-                if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PUBLIC, method.accessFlags))
+                if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PUBLIC, accessFlags))
                     Options.DisplayLevel.PUBLIC
-                else if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PROTECTED, method.accessFlags))
+                else if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PROTECTED, accessFlags))
                     Options.DisplayLevel.PROTECTED
-                else if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PRIVATE, method.accessFlags))
+                else if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PRIVATE, accessFlags))
                     Options.DisplayLevel.PRIVATE
                 else Options.DisplayLevel.PACKAGE
             if (level.ordinal >= requiredLevel.ordinal) {
-                val sb = StringBuilder()
-                with(sb) {
-                    append(method.getReadableName()).append("\n\t")
-                    append("Method Access Flags:\n")
-                    methodAccessArray(method.accessFlags).forEach { append("\t\tACC_").append(it.name).append('\n') }
-                    // Find CodeAttribute first.
-                    var codeAttr: CodeAttribute? = null
-                    for (attribute in method.attributes) {
-                        if (getUtf(attribute.attributeNameIndex) == "Code") {
-                            codeAttr = attribute as CodeAttribute
-                            break
+                with(StringBuilder()) {
+                    append(getReadableName())
+                    if (access) {
+                        append("\n\t").append("Method Access Flags:\n")
+                        for (acc in methodAccessArray(accessFlags)) {
+                            append("\t\tACC_").append(acc.name).append('\n')
                         }
                     }
-                    if (codeAttr == null) {
-                        throw ExceptionInInitializerError("Can not access the CodeAttribute in method ${method.getJVMName()}.")
-                    }
-                    if (instructions) {
-                        val instructions = Bytecodes.getJvm_instructions_array()
-                        for (b in codeAttr.code) {
-                            //TODO: finish read.
-                        }
-                    }
-                    if (lines_locals) {
-
-                    }
-                    return sb.toString()
+                    translateCodeAttribute(findCodeAttribute(method), this)
+                    translateMethodAttributes(method, this)
+                    return toString()
                 }
             }
         }
         return ""
+    }
+
+    private fun translateCodeAttribute(code: CodeAttribute?, buf: StringBuilder) {
+        if (code == null)
+            return
+    }
+
+    private fun translateMethodAttributes(method: MethodInfo, buf: StringBuilder) {
+
+    }
+
+    private fun findCodeAttribute(method: MethodInfo): CodeAttribute? {
+        var codeAttr: CodeAttribute? = null
+        for (attribute in method.attributes) {
+            if (getUtf(attribute.attributeNameIndex) == "Code") {
+                codeAttr = attribute as CodeAttribute
+                break
+            }
+        }
+        if (codeAttr == null && !isAccessFlag(METHOD_ACCESS_FLAG_ACC_NATIVE, method.accessFlags))
+            throw ExceptionInInitializerError("Can not access the CodeAttribute in method ${method.getJVMName()}.")
+        return codeAttr
     }
 
     private fun getUtf(index: Int): String = (classReader.cpInfo[index - 1] as ConstUtf8Info).utf8
@@ -185,7 +193,7 @@ class MethodWriter(
     private fun MethodInfo.getJVMName(): String = "${getUtf(nameIndex)}${getUtf(descriptorIndex)}"
 
     private fun MethodInfo.getReadableName(): String {
-        val descriptor = FileProcessor.parseTypeDescriptor(getUtf(descriptorIndex))
+        val descriptor = parseTypeDescriptor(getUtf(descriptorIndex))
         return methodAccessFlags(accessFlags) + descriptor.second + " " + getUtf(nameIndex) + descriptor.first
     }
 

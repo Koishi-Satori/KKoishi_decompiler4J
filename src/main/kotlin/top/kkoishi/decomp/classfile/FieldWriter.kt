@@ -1,15 +1,21 @@
+@file:Suppress("MemberVisibilityCanBePrivate")
+
 package top.kkoishi.decomp.classfile
 
 import top.kkoishi.cv4j.ClassReader
 import top.kkoishi.cv4j.ClassReader.*
+import top.kkoishi.cv4j.FieldInfo
+import top.kkoishi.cv4j.cp.ConstUtf8Info
 import top.kkoishi.decomp.Context
 import top.kkoishi.decomp.DecompileTask
 import top.kkoishi.decomp.Options
+import top.kkoishi.decomp.classfile.FileProcessor.Companion.parseTypeDescriptor
 
 class FieldWriter(
     val classReader: ClassReader,
     context: Context,
     val level: Options.DisplayLevel,
+    val access: Boolean,
 ) : Context() {
     val task = DecompileTask.instance(context)
 
@@ -94,9 +100,65 @@ class FieldWriter(
                     return buf.toString()
             }
         }
+
+        @JvmStatic
+        fun isAccessFlag(magic_number: Int, accessFlags: Int): Boolean {
+            var cpy = accessFlags
+            jvmFieldAccessFlags.forEach {
+                with(it) {
+                    if (cpy >= first) {
+                        if (first == magic_number) {
+                            return true
+                        }
+                        cpy -= first
+                    }
+                }
+            }
+            return false
+        }
     }
 
-    fun process() {
-
+    fun process() = classReader.fieldTable.forEach {
+        with(processField(it)) {
+            if (isNotEmpty())
+                task.report(this)
+        }
     }
+
+    internal fun processField(field: FieldInfo): String {
+        with(field) {
+            val requiredLevel: Options.DisplayLevel =
+                if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PUBLIC, accessFlags))
+                    Options.DisplayLevel.PUBLIC
+                else if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PROTECTED, accessFlags))
+                    Options.DisplayLevel.PROTECTED
+                else if (isAccessFlag(METHOD_ACCESS_FLAG_ACC_PRIVATE, accessFlags))
+                    Options.DisplayLevel.PRIVATE
+                else Options.DisplayLevel.PACKAGE
+            if (level.ordinal >= requiredLevel.ordinal) {
+                with(StringBuilder()) {
+                    append(getReadableName())
+                    if (access) {
+                        append("\n\t").append("Field Access Flags:\n")
+                        for (acc in fieldAccessArray(accessFlags)) {
+                            append("\t\tACC_").append(acc.name).append('\n')
+                        }
+                    }
+                    return toString()
+                }
+            }
+        }
+        return ""
+    }
+
+    private fun getUtf(index: Int): String = (classReader.cpInfo[index - 1] as ConstUtf8Info).utf8
+
+    private fun FieldInfo.getJVMName() = "${getUtf(nameIndex)}${getUtf(descriptorIndex)}"
+
+    private fun FieldInfo.getReadableName(): String {
+        val descriptor = parseTypeDescriptor(getUtf(descriptorIndex))
+        return fieldAccessFlags(accessFlags) + descriptor.first + " " + getUtf(nameIndex)
+    }
+
+    fun size() = classReader.fieldTable.size
 }
