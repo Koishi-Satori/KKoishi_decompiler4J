@@ -401,7 +401,7 @@ class DecompileTask @JvmOverloads constructor(
          * The arguments of message format.
          */
         @Suppress("UNCHECKED_CAST")
-        internal val args: Array<String> = _args as Array<String>
+        internal val args: Array<*> = _args
 
         /**
          * After capture this exception if it is needed to show usage.
@@ -556,9 +556,9 @@ class DecompileTask @JvmOverloads constructor(
         }
     }
 
-    fun getBadArg(key: String, vararg args: String?) = BadArg(key, getMessage(key, args), args)
+    fun getBadArg(key: String, vararg args: String?) = BadArg(key, getMessage(key, *args), *args)
 
-    fun reportError(errKey: String, vararg args: String) = System.err.println(getMessage(errKey, *args))
+    fun reportError(errKey: String, vararg args: Any?) = System.err.println(getMessage(errKey, *args))
 
     fun report(msg: String) = println(msg.replace("\n", Utils.nl, false).replace("\t", "    ", false))
 }
