@@ -189,6 +189,9 @@ object Options {
 
     @JvmStatic
     var access = false
+
+    @JvmStatic
+    var signature = false
 }
 
 class ResourceException : Exception {
@@ -505,7 +508,7 @@ class DecompileTask @JvmOverloads constructor(
         Options.recognizedOptions.withIndex().forEach {
             with(it) {
                 report(getMessage("main.usage.desc",
-                    it.value.toString(),
+                    value.toString(),
                     getMessage("main.args.${Options.argumentUsageKeys[index]}")))
             }
         }

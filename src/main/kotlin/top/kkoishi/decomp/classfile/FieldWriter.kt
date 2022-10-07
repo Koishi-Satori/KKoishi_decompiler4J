@@ -16,6 +16,7 @@ class FieldWriter(
     context: Context,
     val level: Options.DisplayLevel,
     val access: Boolean,
+    val signature: Boolean
 ) : Context() {
     val task = DecompileTask.instance(context)
 
@@ -137,11 +138,13 @@ class FieldWriter(
                 else Options.DisplayLevel.PACKAGE
             if (level.ordinal >= requiredLevel.ordinal) {
                 with(StringBuilder()) {
-                    append(getReadableName())
+                    append(getReadableName()).append(';')
+                    if (signature)
+                        append("\n\t").append("Descriptor: ").append(getUtf(descriptorIndex))
                     if (access) {
-                        append("\n\t").append("Field Access Flags:\n")
+                        append("\n\tField Access Flags(0X").append(accessFlags.toString(16)).append("):")
                         for (acc in fieldAccessArray(accessFlags)) {
-                            append("\t\tACC_").append(acc.name).append('\n')
+                            append(' ').append("ACC_").append(acc.name)
                         }
                     }
                     return toString()

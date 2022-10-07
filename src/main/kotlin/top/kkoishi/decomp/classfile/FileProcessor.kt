@@ -279,15 +279,27 @@ class FileProcessor(val context: Context) {
             reportConstantPool()
 
         val fw: FieldWriter = if (Options.verbose)
-            FieldWriter(cr, context, Options.DisplayLevel.PRIVATE, access = true)
+            FieldWriter(cr, context, Options.DisplayLevel.PRIVATE, access = true, signature = true)
         else
-            FieldWriter(cr, context, Options.level, Options.access)
+            FieldWriter(cr, context, Options.level, Options.access, Options.signature)
         fw.process()
 
         val mw: MethodWriter = if (Options.verbose) {
-            MethodWriter(cr, context, Options.DisplayLevel.PRIVATE, lines_locals = true, instructions = true, access = true)
+            MethodWriter(cr,
+                context,
+                Options.DisplayLevel.PRIVATE,
+                lines_locals = true,
+                instructions = true,
+                access = true,
+                signature = true)
         } else {
-            MethodWriter(cr, context, Options.level, Options.lines_locals, Options.instructions, Options.access)
+            MethodWriter(cr,
+                context,
+                Options.level,
+                Options.lines_locals,
+                Options.instructions,
+                Options.access,
+                Options.signature)
         }
         mw.process()
     }
