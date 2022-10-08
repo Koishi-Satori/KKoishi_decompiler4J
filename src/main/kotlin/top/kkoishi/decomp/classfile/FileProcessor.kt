@@ -1,3 +1,5 @@
+@file:Suppress("LocalVariableName")
+
 package top.kkoishi.decomp.classfile
 
 import top.kkoishi.cv4j.ClassReader
@@ -10,9 +12,9 @@ import top.kkoishi.cv4j.attr.SourceFileAttribute
 import top.kkoishi.cv4j.cp.ConstClassInfo
 import top.kkoishi.cv4j.cp.ConstUtf8Info
 import top.kkoishi.decomp.*
+import java.io.IOException
 import java.nio.file.Path
-import kotlin.io.path.getLastModifiedTime
-import kotlin.io.path.readBytes
+import kotlin.io.path.*
 import kotlin.jvm.Throws
 
 class FileProcessor(val context: Context) {
@@ -21,7 +23,7 @@ class FileProcessor(val context: Context) {
         var processorOptions: Array<Option> = arrayOf(
             object : Option(true, "-cp", "-classpath") {
                 override fun process(task: DecompileTask, opt: String, arg: String?) {
-                    TODO("Not yet implemented")
+                    Options.classpath = true
                 }
             }
         )
@@ -234,12 +236,31 @@ class FileProcessor(val context: Context) {
         task.classes.addLast(name)
     }
 
+    @Throws(IOException::class)
+    private fun getFilePath(name: String): Path {
+        if (name.endsWith(".class")) {
+            return Path.of(System.getProperty("user.dir") + '/' + name)
+        } else {
+            if (Options.classpath) {
+                val task = DecompileTask.instance(context)
+                @Suppress("CanBeVal")
+                var p = Path.of(name)
+                if (p.exists()) {
+                    val classes = p.readText()
+                    TODO()
+                }
+            }
+            throw IOException()
+        }
+    }
+
+    @Suppress("MoveVariableDeclarationIntoWhen")
     fun processFile(name: String) {
         val task = DecompileTask.instance(context)
         if (Options.sysinfo) {
             task.report("Try to processing class $name")
         }
-        val p = Path.of(name)
+        val p = getFilePath(name)
         val cr = ClassReader(p.readBytes())
         cr.read()
         task.report("${
@@ -248,8 +269,8 @@ class FileProcessor(val context: Context) {
         }\nLastModified time:${p.getLastModifiedTime()}")
         // Report class file attributes
         for (attr in cr.classFileAttributeTable) {
-            val name = (cr.cpInfo[attr.attributeNameIndex] as ConstUtf8Info).utf8
-            when (name) {
+            val attribute_name = (cr.cpInfo[attr.attributeNameIndex] as ConstUtf8Info).utf8
+            when (attribute_name) {
                 "SourceFile" ->
                     task.report(task.getMessage("main.files.resource",
                         (cr.cpInfo[(attr as SourceFileAttribute).sourceFileIndex] as ConstUtf8Info).utf8))
@@ -305,6 +326,6 @@ class FileProcessor(val context: Context) {
     }
 
     private fun innerClassInfo(name: String, accessFlags: Int): String {
-        TODO()
+        return Utils.parseClassAccessFlags(accessFlags) + ' ' + name
     }
 }

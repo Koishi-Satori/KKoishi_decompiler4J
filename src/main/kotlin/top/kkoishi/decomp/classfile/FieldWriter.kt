@@ -38,6 +38,7 @@ class FieldWriter(
             PUBLIC("public", SIGNATURE_PERMISSION);
 
             companion object {
+                @JvmStatic
                 internal fun cmp(): Comparator<FieldAccess> {
                     return Comparator { o1, o2 ->
                         if (o1.signature == o2.signature)

@@ -33,6 +33,7 @@ class MethodWriter(
         const val SIGNATURE_MID: Byte = 0x02
         const val SIGNATURE_LOW: Byte = 0x03
         const val SIGNATURE_HIDE: Byte = 0x0f
+        const val GOTO_OFFSET_BASE = 0X10000
 
         internal enum class MethodAccess constructor(val identifiedName: String, val signature: Byte = SIGNATURE_HIDE) {
             SYNTHETIC("synthetic"),
@@ -49,6 +50,7 @@ class MethodWriter(
             PUBLIC("public", SIGNATURE_PERMISSION);
 
             companion object {
+                @JvmStatic
                 internal fun cmp(): Comparator<MethodAccess> {
                     return Comparator { o1, o2 ->
                         if (o1.signature == o2.signature)
@@ -75,7 +77,6 @@ class MethodWriter(
                 METHOD_ACCESS_FLAG_ACC_PRIVATE to MethodAccess.PRIVATE,
                 METHOD_ACCESS_FLAG_ACC_PUBLIC to MethodAccess.PUBLIC)
 
-        const val GOTO_OFFSET_BASE = 0X10000
 
         @JvmStatic
         fun isAccessFlag(magic_number: Int, accessFlags: Int): Boolean {

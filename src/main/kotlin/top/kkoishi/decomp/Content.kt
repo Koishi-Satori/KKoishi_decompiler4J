@@ -13,6 +13,7 @@ import java.nio.file.Path
 import java.text.DateFormat
 import java.text.MessageFormat
 import java.util.*
+import kotlin.Comparator
 import kotlin.collections.ArrayDeque
 import kotlin.io.path.readText
 import kotlin.reflect.KClass
@@ -30,6 +31,11 @@ object Utils {
     @JvmStatic
     val nl = System.getProperty("line.separator")
 
+    const val SIGNATURE_PERMISSION: Byte = 0x00
+    const val SIGNATURE_MOD: Byte = 0x01
+    const val SIGNATURE_TYPE: Byte = 0x0e
+    const val SIGNATURE_HIDE: Byte = 0x0f
+
     @JvmStatic
     fun getLocale(): Locale {
         var o = jsonMaps["property"]
@@ -42,32 +48,88 @@ object Utils {
         return Locale(o["current_locale"] as String)
     }
 
-    @JvmStatic
-    private val classAccessFlags: Array<Pair<Int, String>> = arrayOf(
-        ClassReader.ACC_MODULE to "module",
-        ClassReader.ACC_ENUM to "enum ",
-        ClassReader.ACC_ANNOTATION to "@interface ",
-        ClassReader.ACC_SYNTHETIC to "",
-        ClassReader.ACC_ABSTRACT to "abstract ",
-        ClassReader.ACC_INTERFACE to "interface ",
-        ClassReader.ACC_SUPER to "",
-        ClassReader.ACC_FINAL to "final ",
-        ClassReader.ACC_PUBLIC to "public "
-    )
-
-    @JvmStatic
-    fun parseClassAccessFlags(accessFlags: Int): String {
-        var cpy = accessFlags
-        val buf = StringBuilder()
-        classAccessFlags.forEach {
-            with(it) {
-                if (cpy >= first) {
-                    cpy -= first
-                    buf.append(second)
+    enum class ClassAccess(
+        val identifiedName: String,
+        val signature: Byte = SIGNATURE_PERMISSION,
+    ) {
+        MODULE("module", SIGNATURE_TYPE),
+        ENUM("enum", SIGNATURE_TYPE),
+        ANNOTATION("@interface", SIGNATURE_TYPE),
+        SYNTHETIC("synthetic", SIGNATURE_HIDE),
+        ABSTRACT("abstract", SIGNATURE_MOD),
+        INTERFACE("interface", SIGNATURE_TYPE),
+        SUPER("super", SIGNATURE_HIDE),
+        FINAL("final", SIGNATURE_MOD),
+        PUBLIC("public")
+        ;
+        companion object {
+            @JvmStatic
+            fun cmp(): Comparator<ClassAccess> {
+                return Comparator { o1, o2 ->
+                    if (o1.signature == o2.signature)
+                        o1.ordinal - o2.ordinal
+                    else
+                        o1.signature - o2.signature
                 }
             }
         }
-        return buf.toString()
+    }
+
+    @JvmStatic
+    private val classAccessFlags: Array<Pair<Int, ClassAccess>> = arrayOf(
+        ClassReader.ACC_MODULE to ClassAccess.MODULE,
+        ClassReader.ACC_ENUM to ClassAccess.ENUM,
+        ClassReader.ACC_ANNOTATION to ClassAccess.ANNOTATION,
+        ClassReader.ACC_SYNTHETIC to ClassAccess.SYNTHETIC,
+        ClassReader.ACC_ABSTRACT to ClassAccess.ABSTRACT,
+        ClassReader.ACC_INTERFACE to ClassAccess.INTERFACE,
+        ClassReader.ACC_SUPER to ClassAccess.SUPER,
+        ClassReader.ACC_FINAL to ClassAccess.FINAL,
+        ClassReader.ACC_PUBLIC to ClassAccess.PUBLIC
+    )
+
+    @JvmStatic
+    @Suppress("LocalVariableName")
+    internal fun classAccessArray(accessFlags: Int): ArrayDeque<ClassAccess> {
+        val res: ArrayDeque<ClassAccess> = ArrayDeque(0)
+        var _accessFlags = accessFlags
+        for (acc in classAccessFlags) {
+            if (_accessFlags >= acc.first) {
+                _accessFlags -= acc.first
+                res.addLast(acc.second)
+            }
+        }
+        return res
+    }
+
+    private fun parseClassAccessFlags0(accessFlags: ArrayDeque<ClassAccess>): ArrayDeque<ClassAccess> {
+        val res: ArrayDeque<ClassAccess> = ArrayDeque(accessFlags.size)
+        for (acc in accessFlags) {
+            if (acc.signature != SIGNATURE_HIDE)
+                res.addLast(acc)
+        }
+        res.sortWith(ClassAccess.cmp())
+        return res
+    }
+
+    @JvmStatic
+    fun parseClassAccessFlags(accessFlags: Int): String {
+        val rest = parseClassAccessFlags0(classAccessArray(accessFlags)).iterator()
+        if (!rest.hasNext())
+            return "class "
+        var hasClassSignature = false
+        val buf = StringBuilder()
+        while (true) {
+            val acc = rest.next()
+            if (acc.signature == SIGNATURE_TYPE)
+                hasClassSignature = true
+            buf.append(acc).append(' ')
+            if (!rest.hasNext()) {
+                if (!hasClassSignature)
+                    buf.append("class ")
+                return buf.toString()
+            }
+        }
     }
 }
 
@@ -161,7 +223,9 @@ object Options {
         "locals",
         "verbose",
         "instruction",
-        "access")
+        "access",
+        "signature",
+        "classpath")
 
     @JvmStatic
     var help = false
@@ -192,6 +256,9 @@ object Options {
 
     @JvmStatic
     var signature = false
+
+    @JvmStatic
+    var classpath = false
 }
 
 class ResourceException : Exception {
