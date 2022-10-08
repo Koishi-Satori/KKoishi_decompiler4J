@@ -37,21 +37,31 @@ object Utils {
     const val SIGNATURE_HIDE: Byte = 0x0f
 
     @JvmStatic
+    fun initJson() {
+        jsonMaps["property"] = MappedJsonObject(mapOf("current_locale" to Locale("en_us")))
+    }
+
+    @JvmStatic
     fun getLocale(): Locale {
         var o = jsonMaps["property"]
         if (o == null) {
-            jsonParser = JsonParser(Path.of("./data/property.json").readText())
-            jsonParser!!.parse()
-            o = MappedJsonObject.cast(jsonParser!!.result(), HashMap::class.java)
+            try {
+                jsonParser = JsonParser(Path.of("./data/property.json").readText())
+                jsonParser!!.parse()
+                o = MappedJsonObject.cast(jsonParser!!.result(), HashMap::class.java)
+            } catch (e: Exception) {
+                initJson()
+                o = jsonMaps["property"]
+                if (o == null) {
+                    throw ExceptionInInitializerError("Can not initialize property.")
+                }
+            }
         }
         jsonMaps["property"] = o!!
         return Locale(o["current_locale"] as String)
     }
 
-    enum class ClassAccess(
-        val identifiedName: String,
-        val signature: Byte = SIGNATURE_PERMISSION,
-    ) {
+    enum class ClassAccess(val identifiedName: String, val signature: Byte = SIGNATURE_PERMISSION) {
         MODULE("module", SIGNATURE_TYPE),
         ENUM("enum", SIGNATURE_TYPE),
         ANNOTATION("@interface", SIGNATURE_TYPE),
@@ -123,7 +133,7 @@ object Utils {
             val acc = rest.next()
             if (acc.signature == SIGNATURE_TYPE)
                 hasClassSignature = true
-            buf.append(acc).append(' ')
+            buf.append(acc.identifiedName).append(' ')
             if (!rest.hasNext()) {
                 if (!hasClassSignature)
                     buf.append("class ")
