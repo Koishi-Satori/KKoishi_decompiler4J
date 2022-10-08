@@ -10,8 +10,11 @@ import top.kkoishi.cv4j.DecompilerException
 import top.kkoishi.cv4j.attr.InnerClassAttribute
 import top.kkoishi.cv4j.attr.SourceFileAttribute
 import top.kkoishi.cv4j.cp.ConstClassInfo
+import top.kkoishi.cv4j.cp.ConstNameAndTypeInfo
 import top.kkoishi.cv4j.cp.ConstUtf8Info
 import top.kkoishi.decomp.*
+import top.kkoishi.decomp.Utils.REF_names
+import top.kkoishi.decomp.classfile.FileProcessor.Companion.toShort
 import java.io.IOException
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -136,70 +139,95 @@ class FileProcessor(val context: Context) {
 
         @JvmStatic
         fun ConstPoolInfo.report(index: Int, context: ClassReader): String {
-            val sb = StringBuilder("\t#")
+            val buf = StringBuilder("\t#")
             if (index < 10)
-                sb.append("0")
-            sb.append(index).append(" = ").append(constantsNames[this.tag().toInt()]).append("\t\t")
+                buf.append("0")
+            buf.append(index).append(" = ").append(constantsNames[this.tag().toInt()]).append("\t\t")
+            fun reportRefImpl(classIndex: Int, nameAndTypeIndex: Int) {
+                with(context) {
+                    val classInfo = cpInfo[classIndex - 1]
+                    @Suppress("UNCHECKED_CAST") val datum =
+                        cpInfo[nameAndTypeIndex - 1].data() as Array<ByteArray>
+                    buf.append((cpInfo[(classInfo.data() as ByteArray).toShort().toInt() - 1]
+                            as ConstUtf8Info).utf8).append('.')
+                        .append((cpInfo[datum[0].toShort().toInt() - 1] as ConstUtf8Info).utf8)
+                        .append('.').append((cpInfo[datum[1].toShort().toInt() - 1]
+                                as ConstUtf8Info).utf8)
+                }
+            }
             when (this.tag()) {
-                CONSTANT_UTF8_INFO -> sb.append((this as ConstUtf8Info).utf8)
-                CONSTANT_INTEGER_INFO -> sb.append(toInt(this.data() as ByteArray))
-                CONSTANT_FLOAT_INFO -> sb.append(Float.fromBits(toInt(this.data() as ByteArray)))
-                CONSTANT_LONG_INFO -> sb.append((this.data() as ByteArray).toLong())
-                CONSTANT_DOUBLE_INFO -> sb.append(Double.fromBits((this.data() as ByteArray).toLong()))
+                CONSTANT_UTF8_INFO -> buf.append((this as ConstUtf8Info).utf8)
+                CONSTANT_INTEGER_INFO -> buf.append(toInt(this.data() as ByteArray))
+                CONSTANT_FLOAT_INFO -> buf.append(Float.fromBits(toInt(this.data() as ByteArray)))
+                CONSTANT_LONG_INFO -> buf.append((this.data() as ByteArray).toLong())
+                CONSTANT_DOUBLE_INFO -> buf.append(Double.fromBits((this.data() as ByteArray).toLong()))
                 CONSTANT_CLASS_INFO -> {
                     val i = (this.data() as ByteArray).toShort().toInt()
-                    sb.append('#').append(i).append("\t\t\t//").append((context.cpInfo[i] as ConstUtf8Info).utf8)
+                    buf.append('#').append(i).append("\t\t\t//").append((context.cpInfo[i] as ConstUtf8Info).utf8)
                 }
-                CONSTANT_STRING_INFO -> sb.append((context.cpInfo[(this.data() as ByteArray).toShort()
+                CONSTANT_STRING_INFO -> buf.append((context.cpInfo[(this.data() as ByteArray).toShort()
                     .toInt()] as ConstUtf8Info).utf8)
                 CONSTANT_NAME_AND_TYPE_INFO -> {
                     @Suppress("UNCHECKED_CAST") val data = this.data() as Array<ByteArray>
-                    val nameIndex = data[0].toShort().toInt()
-                    val descriptorIndex = data[1].toShort().toInt()
-                    sb.append('#').append(nameIndex).append('#')
-                        .append(descriptorIndex).append("\t\t\t//")
-                        .append((context.cpInfo[nameIndex - 1] as ConstUtf8Info).utf8)
-                        .append((context.cpInfo[descriptorIndex - 1] as ConstUtf8Info).utf8)
+                    val name_index = data[0].toShort().toInt()
+                    val descriptor_index = data[1].toShort().toInt()
+                    buf.append('#').append(name_index).append('#')
+                        .append(descriptor_index).append("\t\t\t//")
+                        .append((context.cpInfo[name_index - 1] as ConstUtf8Info).utf8)
+                        .append((context.cpInfo[descriptor_index - 1] as ConstUtf8Info).utf8)
                 }
                 CONSTANT_FIELDREF_INFO, CONSTANT_METHODREF_INFO, CONSTANT_INTERFACE_METHODREF -> {
                     // Report the CONSTANT_Class_info and CONSTANT_NameAndType_info.
                     @Suppress("UNCHECKED_CAST") val data = this.data() as Array<ByteArray>
-                    val classIndex = data[0].toShort().toInt()
-                    val nameAndTypeIndex = data[1].toShort().toInt()
-                    sb.append('#').append(classIndex).append(".#")
-                        .append(nameAndTypeIndex).append("\t\t\t//")
-                    with(context) {
-                        val classInfo = cpInfo[classIndex - 1]
-                        @Suppress("UNCHECKED_CAST") val datum =
-                            cpInfo[nameAndTypeIndex - 1].data() as Array<ByteArray>
-                        sb.append((cpInfo[(classInfo.data() as ByteArray).toShort().toInt() - 1]
-                                as ConstUtf8Info).utf8).append('.')
-                            .append((cpInfo[datum[0].toShort().toInt() - 1] as ConstUtf8Info).utf8)
-                            .append('.').append((cpInfo[datum[1].toShort().toInt() - 1]
-                                    as ConstUtf8Info).utf8)
-                    }
+                    val class_index = data[0].toShort().toInt()
+                    val name_and_type_index = data[1].toShort().toInt()
+                    buf.append('#').append(class_index).append(".#")
+                        .append(name_and_type_index).append("\t\t\t//")
+                    reportRefImpl(class_index, name_and_type_index)
                 }
                 CONSTANT_METHOD_HANDLE_INFO -> {
-
+                    @Suppress("UNCHECKED_CAST") val datum =
+                        this.data() as Array<ByteArray>
+                    val reference_kind: Byte = datum[0][0]
+                    val reference_index = toInt(datum[1])
+                    buf.append('*').append(reference_kind).append(" #")
+                        .append(reference_index).append("\t\t\t//").append(REF_names[reference_kind - 1])
+                        .append(' ')
+                    @Suppress("UNCHECKED_CAST") val data =
+                        context.cpInfo[reference_index - 1].data() as Array<ByteArray>
+                    val class_index = data[0].toShort().toInt()
+                    val name_and_type_index = data[1].toShort().toInt()
+                    reportRefImpl(class_index, name_and_type_index)
                 }
                 CONSTANT_METHOD_TYPE_INFO -> {
-                    val descriptorIndex = (this.data() as ByteArray).toShort().toInt()
-                    sb.append('#').append(descriptorIndex).append("\t\t\t//")
-                        .append((context.cpInfo[descriptorIndex - 1] as ConstUtf8Info).utf8)
+                    val descriptor_index = (this.data() as ByteArray).toShort().toInt()
+                    buf.append('#').append(descriptor_index).append("\t\t\t//")
+                        .append((context.cpInfo[descriptor_index - 1] as ConstUtf8Info).utf8)
                 }
-                CONSTANT_DYNAMIC -> {
-
-                }
-                CONSTANT_INVOKE_DYNAMIC_INFO -> {
-
+                CONSTANT_DYNAMIC, CONSTANT_INVOKE_DYNAMIC_INFO -> {
+                    @Suppress("UNCHECKED_CAST") val datum =
+                        this.data() as Array<ByteArray>
+                    val bootstrap_method_attr_index = toInt(datum[0])
+                    val name_and_type_index = toInt(datum[1])
+                    buf.append("bootstrap method#").append(bootstrap_method_attr_index)
+                        .append("  #").append(name_and_type_index)
+                    with (context) {
+                        @Suppress("UNCHECKED_CAST") val nameType =
+                            (cpInfo[name_and_type_index - 1] as ConstNameAndTypeInfo).data() as Array<ByteArray>
+                        val name_index = nameType[0].toShort().toInt()
+                        val descriptor_index = nameType[1].toShort().toInt()
+                        buf.append("\t\t//")
+                            .append((context.cpInfo[name_index - 1] as ConstUtf8Info).utf8)
+                            .append((context.cpInfo[descriptor_index - 1] as ConstUtf8Info).utf8)
+                    }
                 }
                 CONSTANT_MODULE, CONSTANT_PACKAGE -> {
-                    val nameIndex = (this.data() as ByteArray).toShort().toInt()
-                    sb.append('#').append(nameIndex).append("\t\t\t//")
-                        .append((context.cpInfo[nameIndex - 1] as ConstUtf8Info).utf8)
+                    val name_index = (this.data() as ByteArray).toShort().toInt()
+                    buf.append('#').append(name_index).append("\t\t\t//")
+                        .append((context.cpInfo[name_index - 1] as ConstUtf8Info).utf8)
                 }
             }
-            return sb.toString()
+            return buf.toString()
         }
 
         @JvmStatic
@@ -243,6 +271,7 @@ class FileProcessor(val context: Context) {
         } else {
             if (Options.classpath) {
                 val task = DecompileTask.instance(context)
+
                 @Suppress("CanBeVal")
                 var p = Path.of(name)
                 if (p.exists()) {

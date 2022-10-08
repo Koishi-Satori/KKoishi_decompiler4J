@@ -35,6 +35,26 @@ object Utils {
     const val SIGNATURE_MOD: Byte = 0x01
     const val SIGNATURE_TYPE: Byte = 0x0e
     const val SIGNATURE_HIDE: Byte = 0x0f
+    const val REF_getField: Byte = 0x01
+    const val REF_getStatic: Byte = 0x02
+    const val REF_putField: Byte = 0x03
+    const val REF_putStatic: Byte = 0x04
+    const val REF_invokeVirtual: Byte = 0x05
+    const val REF_invokeStatic: Byte = 0x06
+    const val REF_invokeSpecial: Byte = 0x07
+    const val REF_newInvokeSpecial: Byte = 0x08
+    const val REF_invokeInterface: Byte = 0x09
+
+    @JvmStatic
+    val REF_names = arrayOf("getField",
+        "getStatic",
+        "putField",
+        "putStatic",
+        "invokeVirtual",
+        "invokeStatic",
+        "invokeSpecial",
+        "newInvokeSpecial",
+        "invokeInterface")
 
     @JvmStatic
     fun initJson() {
@@ -72,6 +92,7 @@ object Utils {
         FINAL("final", SIGNATURE_MOD),
         PUBLIC("public")
         ;
+
         companion object {
             @JvmStatic
             fun cmp(): Comparator<ClassAccess> {
