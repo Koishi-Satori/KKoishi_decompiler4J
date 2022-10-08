@@ -2,6 +2,7 @@
 
 package top.kkoishi.decomp.classfile
 
+import top.kkoishi.cv4j.Attribute_info
 import top.kkoishi.cv4j.ClassReader
 import top.kkoishi.cv4j.ClassReader.toInt
 import top.kkoishi.cv4j.ConstPoolInfo
@@ -283,6 +284,27 @@ class FileProcessor(val context: Context) {
         }
     }
 
+    fun parseFileAttribute(attr: Attribute_info, task: DecompileTask, cr: ClassReader) {
+        val attribute_name = (cr.cpInfo[attr.attributeNameIndex] as ConstUtf8Info).utf8
+        when (attribute_name) {
+            "SourceFile" ->
+                task.report(task.getMessage("main.files.resource",
+                    (cr.cpInfo[(attr as SourceFileAttribute).sourceFileIndex] as ConstUtf8Info).utf8))
+            "InnerClasses" -> {
+                val classIndices = (attr as InnerClassAttribute).innerClassesInfo
+                classIndices.forEach {
+                    task.report(task.getMessage("main.files.innerclass",
+                        innerClassInfo((cr.cpInfo[it.innerNameIndex] as ConstUtf8Info).utf8,
+                            it.innerClassAccessFlags)))
+                }
+            }
+            "Deprecated" -> task.report("\tThis class is deprecated.")
+            "SourceDebugExtension" -> {
+
+            }
+        }
+    }
+
     @Suppress("MoveVariableDeclarationIntoWhen")
     fun processFile(name: String) {
         val task = DecompileTask.instance(context)
@@ -297,23 +319,8 @@ class FileProcessor(val context: Context) {
                 p.toRealPath())
         }\nLastModified time:${p.getLastModifiedTime()}")
         // Report class file attributes
-        for (attr in cr.classFileAttributeTable) {
-            val attribute_name = (cr.cpInfo[attr.attributeNameIndex] as ConstUtf8Info).utf8
-            when (attribute_name) {
-                "SourceFile" ->
-                    task.report(task.getMessage("main.files.resource",
-                        (cr.cpInfo[(attr as SourceFileAttribute).sourceFileIndex] as ConstUtf8Info).utf8))
-                "InnerClasses" -> {
-                    val classIndices = (attr as InnerClassAttribute).innerClassesInfo
-                    classIndices.forEach {
-                        task.report(task.getMessage("main.files.innerclass",
-                            innerClassInfo((cr.cpInfo[it.innerNameIndex] as ConstUtf8Info).utf8,
-                                it.innerClassAccessFlags)))
-                    }
-                }
-                "Deprecated" -> task.report("\tThis class is deprecated.")
-            }
-        }
+        for (attr in cr.classFileAttributeTable)
+            parseFileAttribute(attr, task, cr)
         //ClassReader.report(cr)
         task.report(task.getMessage("main.class.head",
             Utils.parseClassAccessFlags(cr.accessFlags),
