@@ -84,6 +84,30 @@ object Utils {
         return Locale(o["current_locale"] as String)
     }
 
+    @JvmStatic
+    @JvmOverloads
+    fun formatNumber(v: Int, length: Int, useHex: Boolean = true, head: String = "", formatChar: Char = '0'): String {
+        val buf = StringBuilder(head).append(if (useHex) "0X" else "")
+        val digit = v.toString(if (useHex) 16 else 10)
+        if (digit.length <= length) {
+            val dv = length - digit.length - 1
+            for (ignore in 0..dv)
+                buf.append(formatChar)
+        }
+        return buf.append(digit).toString()
+    }
+
+    @JvmStatic
+    fun Int.length(): Int {
+        var l = 1
+        var cpy = this
+        while (cpy >= 10) {
+            cpy %= 10
+            l++
+        }
+        return l;
+    }
+
     enum class ClassAccess(val identifiedName: String, val signature: Byte = SIGNATURE_PERMISSION) {
         MODULE("module", SIGNATURE_TYPE),
         ENUM("enum", SIGNATURE_TYPE),
@@ -150,7 +174,7 @@ object Utils {
     fun parseClassAccessFlags(accessFlags: Int): String {
         val rest = parseClassAccessFlags0(classAccessArray(accessFlags)).iterator()
         if (!rest.hasNext())
-            return "class "
+            return "class"
         var hasClassSignature = false
         val buf = StringBuilder()
         while (true) {
@@ -160,7 +184,7 @@ object Utils {
             buf.append(acc.identifiedName).append(' ')
             if (!rest.hasNext()) {
                 if (!hasClassSignature)
-                    buf.append("class ")
+                    buf.append("class")
                 return buf.toString()
             }
         }

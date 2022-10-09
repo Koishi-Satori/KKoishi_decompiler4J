@@ -15,6 +15,8 @@ import top.kkoishi.cv4j.cp.ConstNameAndTypeInfo
 import top.kkoishi.cv4j.cp.ConstUtf8Info
 import top.kkoishi.decomp.*
 import top.kkoishi.decomp.Utils.REF_names
+import top.kkoishi.decomp.Utils.formatNumber
+import top.kkoishi.decomp.Utils.length
 import top.kkoishi.decomp.classfile.FileProcessor.Companion.toShort
 import java.io.IOException
 import java.nio.file.Path
@@ -140,10 +142,8 @@ class FileProcessor(val context: Context) {
 
         @JvmStatic
         fun ConstPoolInfo.report(index: Int, context: ClassReader): String {
-            val buf = StringBuilder("\t#")
-            if (index < 10)
-                buf.append("0")
-            buf.append(index).append(" = ").append(constantsNames[this.tag().toInt()]).append("\t\t")
+            val buf = StringBuilder(formatNumber(index, context.cpInfo.size.length(), false, "\t#"))
+            buf.append(" = ").append(constantsNames[this.tag().toInt()]).append("\t\t")
             fun reportRefImpl(classIndex: Int, nameAndTypeIndex: Int) {
                 with(context) {
                     val classInfo = cpInfo[classIndex - 1]
@@ -212,7 +212,7 @@ class FileProcessor(val context: Context) {
                     val name_and_type_index = toInt(datum[1])
                     buf.append("bootstrap method#").append(bootstrap_method_attr_index)
                         .append("  #").append(name_and_type_index)
-                    with (context) {
+                    with(context) {
                         @Suppress("UNCHECKED_CAST") val nameType =
                             (cpInfo[name_and_type_index - 1] as ConstNameAndTypeInfo).data() as Array<ByteArray>
                         val name_index = nameType[0].toShort().toInt()

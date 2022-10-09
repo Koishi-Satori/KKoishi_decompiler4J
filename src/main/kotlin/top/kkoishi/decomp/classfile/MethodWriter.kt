@@ -13,6 +13,8 @@ import top.kkoishi.cv4j.cp.*
 import top.kkoishi.decomp.Context
 import top.kkoishi.decomp.DecompileTask
 import top.kkoishi.decomp.Options
+import top.kkoishi.decomp.Utils
+import top.kkoishi.decomp.Utils.length
 import top.kkoishi.decomp.classfile.FileProcessor.Companion.parseTypeDescriptor
 import kotlin.Comparator
 import kotlin.collections.ArrayDeque
@@ -137,7 +139,7 @@ class MethodWriter(
         @JvmStatic
         @Suppress("UNCHECKED_CAST")
         fun ConstNameAndTypeInfo.intData(): IntArray {
-            with (data() as Array<ByteArray>) {
+            with(data() as Array<ByteArray>) {
                 val data = IntArray(2)
                 data[0] = toInt(this[0])
                 data[1] = toInt(this[1])
@@ -154,7 +156,8 @@ class MethodWriter(
             const_pool: ArrayList<ConstPoolInfo>,
         ): String {
             val inst: Instruction = forInstruction(v.value)
-            val buf = StringBuilder("\t\t").append(inst_pos).append(": ").append(inst.name().lowercase())
+            val buf = StringBuilder("\t\t").append(Utils.formatNumber(inst_pos, length.length(), false, "", ' '))
+                .append(": ").append(inst.name().lowercase())
             val other_bytes = inst.otherBytes()
             if (other_bytes > 0) {
                 if (other_bytes <= 2) {
@@ -331,7 +334,7 @@ class MethodWriter(
                     if (signature)
                         append("\n\t").append("Descriptor: ").append(getUtf(descriptorIndex))
                     if (access) {
-                        append("\n\tMethod Access Flags(0X").append(accessFlags.toString(16)).append("):")
+                        append("\n\tMethod Access Flags(").append(Utils.formatNumber(accessFlags, 4)).append("):")
                         for (acc in methodAccessArray(accessFlags))
                             append(' ').append("ACC_").append(acc.name)
                     }

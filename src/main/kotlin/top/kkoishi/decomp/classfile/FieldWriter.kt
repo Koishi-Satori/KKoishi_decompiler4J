@@ -15,6 +15,7 @@ import top.kkoishi.cv4j.cp.ConstUtf8Info
 import top.kkoishi.decomp.Context
 import top.kkoishi.decomp.DecompileTask
 import top.kkoishi.decomp.Options
+import top.kkoishi.decomp.Utils
 import top.kkoishi.decomp.classfile.FileProcessor.Companion.parseTypeDescriptor
 import top.kkoishi.decomp.classfile.FileProcessor.Companion.toLong
 
@@ -152,7 +153,7 @@ class FieldWriter(
                     if (signature)
                         append("\n\t").append("Descriptor: ").append(getUtf(descriptorIndex))
                     if (access) {
-                        append("\n\tField Access Flags(0X").append(accessFlags.toString(16)).append("):")
+                        append("\n\tField Access Flags(").append(Utils.formatNumber(field.accessFlags, 4)).append("):")
                         for (acc in fieldAccessArray(accessFlags)) {
                             append(' ').append("ACC_").append(acc.name)
                         }
