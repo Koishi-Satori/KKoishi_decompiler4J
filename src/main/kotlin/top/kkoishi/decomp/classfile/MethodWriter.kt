@@ -393,7 +393,9 @@ class MethodWriter(
                 break
             }
         }
-        if (codeAttr == null && !isAccessFlag(METHOD_ACCESS_FLAG_ACC_NATIVE, method.accessFlags))
+        if (codeAttr == null && !isAccessFlag(METHOD_ACCESS_FLAG_ACC_NATIVE, method.accessFlags) && !isAccessFlag(
+                METHOD_ACCESS_FLAG_ACC_ABSTRACT, method.accessFlags)
+        )
             throw ExceptionInInitializerError("Can not access the CodeAttribute in method ${method.getJVMName()}.")
         return codeAttr
     }
