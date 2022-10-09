@@ -164,10 +164,10 @@ class FileProcessor(val context: Context) {
                 CONSTANT_DOUBLE_INFO -> buf.append(Double.fromBits((this.data() as ByteArray).toLong()))
                 CONSTANT_CLASS_INFO -> {
                     val i = (this.data() as ByteArray).toShort().toInt()
-                    buf.append('#').append(i).append("\t\t\t//").append((context.cpInfo[i] as ConstUtf8Info).utf8)
+                    buf.append('#').append(i).append("\t\t\t//").append((context.cpInfo[i - 1] as ConstUtf8Info).utf8)
                 }
                 CONSTANT_STRING_INFO -> buf.append((context.cpInfo[(this.data() as ByteArray).toShort()
-                    .toInt()] as ConstUtf8Info).utf8)
+                    .toInt() - 1] as ConstUtf8Info).utf8)
                 CONSTANT_NAME_AND_TYPE_INFO -> {
                     @Suppress("UNCHECKED_CAST") val data = this.data() as Array<ByteArray>
                     val name_index = data[0].toShort().toInt()
@@ -289,16 +289,16 @@ class FileProcessor(val context: Context) {
     }
 
     fun parseFileAttribute(attr: Attribute_info, task: DecompileTask, cr: ClassReader) {
-        val attribute_name = (cr.cpInfo[attr.attributeNameIndex] as ConstUtf8Info).utf8
+        val attribute_name = (cr.cpInfo[attr.attributeNameIndex - 1] as ConstUtf8Info).utf8
         when (attribute_name) {
             "SourceFile" ->
                 task.report(task.getMessage("main.files.resource",
-                    (cr.cpInfo[(attr as SourceFileAttribute).sourceFileIndex] as ConstUtf8Info).utf8))
+                    (cr.cpInfo[(attr as SourceFileAttribute).sourceFileIndex - 1] as ConstUtf8Info).utf8))
             "InnerClasses" -> {
                 val classIndices = (attr as InnerClassAttribute).innerClassesInfo
                 classIndices.forEach {
                     task.report(task.getMessage("main.files.innerclass",
-                        innerClassInfo((cr.cpInfo[it.innerNameIndex] as ConstUtf8Info).utf8,
+                        innerClassInfo((cr.cpInfo[it.innerNameIndex - 1] as ConstUtf8Info).utf8,
                             it.innerClassAccessFlags)))
                 }
             }

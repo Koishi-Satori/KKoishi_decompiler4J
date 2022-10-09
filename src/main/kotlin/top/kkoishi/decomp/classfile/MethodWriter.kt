@@ -187,7 +187,7 @@ class MethodWriter(
 
                         fun getMethodUtf(methodInfoIndex: Int): String {
                             @Suppress("UNCHECKED_CAST")
-                            with((const_pool[methodInfoIndex] as ConstMethodrefInfo).data() as Array<ByteArray>) {
+                            with(const_pool[methodInfoIndex].data() as Array<ByteArray>) {
                                 val nameAndType = (const_pool[toInt(this[1]) - 1] as ConstNameAndTypeInfo).intData()
                                 return getClassUtf(toInt(this[0]) - 1) + '.' +
                                         (const_pool[nameAndType[0] - 1] as ConstUtf8Info).utf8 + ':' +
