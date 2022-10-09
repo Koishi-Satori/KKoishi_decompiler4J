@@ -267,21 +267,25 @@ class FileProcessor(val context: Context) {
 
     @Throws(IOException::class)
     private fun getFilePath(name: String): Path {
+        var p = Path.of(name)
         if (name.endsWith(".class")) {
-            return Path.of(System.getProperty("user.dir") + '/' + name)
+            if (p.exists())
+                return p
+            val cur = System.getProperty("workdir") ?: Utils.cwd
+            p = Path.of("$cur/$name")
+            if (p.exists())
+                return p
         } else {
             if (Options.classpath) {
                 val task = DecompileTask.instance(context)
-
-                @Suppress("CanBeVal")
-                var p = Path.of(name)
+                System.getProperties()
                 if (p.exists()) {
                     val classes = p.readText()
                     TODO()
                 }
             }
-            throw IOException()
         }
+        throw IOException("Can not find file $p")
     }
 
     fun parseFileAttribute(attr: Attribute_info, task: DecompileTask, cr: ClassReader) {
@@ -336,9 +340,9 @@ class FileProcessor(val context: Context) {
             reportConstantPool()
 
         val fw: FieldWriter = if (Options.verbose)
-            FieldWriter(cr, context, Options.DisplayLevel.PRIVATE, access = true, signature = true)
+            FieldWriter(cr, context, Options.DisplayLevel.PRIVATE, access = true, signature = true, constants = true)
         else
-            FieldWriter(cr, context, Options.level, Options.access, Options.signature)
+            FieldWriter(cr, context, Options.level, Options.access, Options.signature, constants = Options.constants)
         fw.process()
 
         val mw: MethodWriter = if (Options.verbose) {

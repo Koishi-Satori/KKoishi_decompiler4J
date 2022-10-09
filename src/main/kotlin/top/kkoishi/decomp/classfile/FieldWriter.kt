@@ -4,19 +4,27 @@ package top.kkoishi.decomp.classfile
 
 import top.kkoishi.cv4j.ClassReader
 import top.kkoishi.cv4j.ClassReader.*
+import top.kkoishi.cv4j.ConstPoolInfo
+import top.kkoishi.cv4j.ConstPoolInfo.*
+import top.kkoishi.cv4j.DecompilerException
 import top.kkoishi.cv4j.FieldInfo
+import top.kkoishi.cv4j.attr.ConstantValueAttribute
+import top.kkoishi.cv4j.cp.ConstIntegerInfo
+import top.kkoishi.cv4j.cp.ConstStringInfo
 import top.kkoishi.cv4j.cp.ConstUtf8Info
 import top.kkoishi.decomp.Context
 import top.kkoishi.decomp.DecompileTask
 import top.kkoishi.decomp.Options
 import top.kkoishi.decomp.classfile.FileProcessor.Companion.parseTypeDescriptor
+import top.kkoishi.decomp.classfile.FileProcessor.Companion.toLong
 
 class FieldWriter(
     val classReader: ClassReader,
     context: Context,
     val level: Options.DisplayLevel,
     val access: Boolean,
-    val signature: Boolean
+    val signature: Boolean,
+    val constants: Boolean,
 ) : Context() {
     val task = DecompileTask.instance(context)
 
@@ -118,6 +126,7 @@ class FieldWriter(
             }
             return false
         }
+
     }
 
     fun process() = classReader.fieldTable.forEach {
@@ -148,11 +157,41 @@ class FieldWriter(
                             append(' ').append("ACC_").append(acc.name)
                         }
                     }
+                    if (constants)
+                        field.constantValue(this)
                     return toString()
                 }
             }
         }
         return ""
+    }
+
+    fun FieldInfo.constantValue(buf: StringBuilder) {
+        var constvalue: ConstantValueAttribute? = null
+        val cp = classReader.cpInfo
+        for (attr in this.attributes) {
+            val attribute_name = (cp[attr.attributeNameIndex - 1] as ConstUtf8Info).utf8
+            if (attribute_name == "ConstantValue") {
+                constvalue = attr as ConstantValueAttribute
+            }
+        }
+        if (constvalue != null) {
+            buf.append('\n')
+            val const = cp[constvalue.constantValueIndex - 1]
+            buf.append("\tConstant Value: ")
+                .append(parseTypeDescriptor((cp[this.descriptorIndex - 1] as ConstUtf8Info).utf8).first)
+                .append(' ')
+            when (const.tag()) {
+                CONSTANT_INTEGER_INFO -> buf.append(toInt(const.data() as ByteArray))
+                CONSTANT_FLOAT_INFO -> buf.append(Float.fromBits(toInt(const.data() as ByteArray)))
+                CONSTANT_LONG_INFO -> buf.append((const.data() as ByteArray).toLong())
+                CONSTANT_DOUBLE_INFO -> buf.append(Double.fromBits((const.data() as ByteArray).toLong()))
+                CONSTANT_STRING_INFO -> buf.append((cp[toInt(const.data() as ByteArray) - 1] as ConstUtf8Info).utf8)
+                // This should not happen.
+                else -> throw DecompilerException()
+            }
+        }
+        buf.append('\n')
     }
 
     private fun getUtf(index: Int): String = (classReader.cpInfo[index - 1] as ConstUtf8Info).utf8

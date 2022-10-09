@@ -31,6 +31,9 @@ object Utils {
     @JvmStatic
     val nl = System.getProperty("line.separator")
 
+    @JvmStatic
+    var cwd = ""
+
     const val SIGNATURE_PERMISSION: Byte = 0x00
     const val SIGNATURE_MOD: Byte = 0x01
     const val SIGNATURE_TYPE: Byte = 0x0e
@@ -58,7 +61,7 @@ object Utils {
 
     @JvmStatic
     fun initJson() {
-        jsonMaps["property"] = MappedJsonObject(mapOf("current_locale" to Locale("en_us")))
+        jsonMaps["property"] = MappedJsonObject(mapOf("current_locale" to "en_us"))
     }
 
     @JvmStatic
@@ -240,6 +243,12 @@ object Options {
         object : Option(false, "-access", "-a", "-acc") {
             override fun process(task: DecompileTask, opt: String, arg: String?) {
                 access = true
+            }
+        },
+        object : Option(true, "-ILL+redirect+cwd") {
+            override fun process(task: DecompileTask, opt: String, arg: String?) {
+                if (arg != null)
+                    Utils.cwd = arg
             }
         })
 
